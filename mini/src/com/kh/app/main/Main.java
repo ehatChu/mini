@@ -12,7 +12,7 @@ public class Main {
 		t.getInfo();
 		t.getMemberTime();
 		t.earnTimePoint();
-		
+		System.out.println("mac commit");
 	}
 
 }
