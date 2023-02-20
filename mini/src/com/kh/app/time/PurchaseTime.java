@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Time;
 
 import javax.print.attribute.IntegerSyntax;
 
@@ -21,14 +22,15 @@ public final class PurchaseTime {
 			System.out.println("=========피시방 요금===========");
 		
 		
-			String sql = "SELECT * FROM TIME";
+			String sql = "SELECT * FROM TIME ORDER BY T_NUM";
 			PreparedStatement pstmt = conn.prepareStatement(sql);
 			ResultSet rs = pstmt.executeQuery();
 			//시간권 목록 보여주기
 			while(rs.next()) {
 				System.out.println(rs.getString("T_NUM")+".가격:"+rs.getString("T_PRICE")+"원,시간:"+rs.getString("T_TIME")+"분");
 			}
-			System.out.println("9.이전화면으로 돌아가기");
+			//0이면 돌아가는 거 구현해야함. 
+			System.out.println("0.이전화면으로 돌아가기");
 		
 			//클로즈
 			conn.close();
@@ -54,41 +56,46 @@ public final class PurchaseTime {
 			TimeData data = new TimeData();
 			System.out.print("요금제를 선택하세요.:");
 			String feeInput = Main.SC.nextLine().trim();
-			int inputNum = Integer.parseInt(feeInput);
-			data.setFeeNum(inputNum);
+			if(feeInput.equals("0")) {
+				System.out.println("로그인 후 선택화면으로 돌아가기");
+			}else {
+			
+				int inputNum = Integer.parseInt(feeInput);
+				data.setFeeNum(inputNum);
 				
 		
-			//feeNum을 받는 동시에 timeAddMin구하기 가능함
-			//timeMin도 당장 받아올수있음. 세게의 변수를 한꺼번에 받아서 data 로 묶자
+				//feeNum을 받는 동시에 timeAddMin구하기 가능함
+				//timeMin도 당장 받아올수있음. 세게의 변수를 한꺼번에 받아서 data 로 묶자
 		
-			Connection conn = JdbcTemplate.getConnection();
-			//timeAddMin구하기 : 요금 결제시 고객이 선택한 추가시간임.
-			String sql1 = "SELECT T_TIME, T_PRICE FROM TIME WHERE T_NUM = ?";
-			PreparedStatement pstmt1 = conn.prepareStatement(sql1); //se
-			pstmt1.setInt(1,data.getFeeNum()); //se
-			ResultSet rs = pstmt1.executeQuery(); //se
-			rs.next(); //se
-			data.setTimeAddMin(rs.getInt("T_TIME"));//se
-			//int timeAddMin = rs.getInt("T_TIME");
-			data.setTimePrice(rs.getInt("T_PRICE")); //se
-			//int timePrice = rs.getInt("T_PRICE");
+				Connection conn = JdbcTemplate.getConnection();
+				//timeAddMin구하기 : 요금 결제시 고객이 선택한 추가시간임.
+				String sql1 = "SELECT T_TIME, T_PRICE FROM TIME WHERE T_NUM = ?";
+				PreparedStatement pstmt1 = conn.prepareStatement(sql1); //se
+				pstmt1.setInt(1,data.getFeeNum()); //se
+				ResultSet rs = pstmt1.executeQuery(); //se
+				rs.next(); //se
+				data.setTimeAddMin(rs.getInt("T_TIME"));//se
+				//int timeAddMin = rs.getInt("T_TIME");
+				data.setTimePrice(rs.getInt("T_PRICE")); //se
+				//int timePrice = rs.getInt("T_PRICE");
 	
-			//timeMin받아오기 : 회원테이블의 남은 시간
-			String sql2 = "SELECT MEM_TIME FROM MEMBER WHERE MEM_NUM= ?";
-			PreparedStatement pstmt2 = conn.prepareStatement(sql2); //se
-			pstmt2.setInt(1, loginMemNum); //se
-			ResultSet rs2 = pstmt2.executeQuery(); //se
-			if(rs2.next()) { //se
-				data.setTimeMin(rs2.getInt("MEM_TIME")); //se
-			//int timeMin = rs2.getInt("MEM_TIME");
-			}
+				//timeMin받아오기 : 회원테이블의 남은 시간
+				String sql2 = "SELECT MEM_TIME FROM MEMBER WHERE MEM_NUM= ?";
+				PreparedStatement pstmt2 = conn.prepareStatement(sql2); //se
+				pstmt2.setInt(1, loginMemNum); //se
+				ResultSet rs2 = pstmt2.executeQuery(); //se
+				if(rs2.next()) { //se
+					data.setTimeMin(rs2.getInt("MEM_TIME")); //se
+					//int timeMin = rs2.getInt("MEM_TIME");
+				}
 				
 			
-			conn.close(); //se
-			//다음단계로 넘어가기
-			getInfo(data);
+				conn.close(); //se
+				//다음단계로 넘어가기
+				getInfo(data);
+			}
 		}catch(SQLException se) {
-			System.out.println("값이 잘못 입력되었는지 확인해주세.");
+			System.out.println("값이 잘못 입력되었는지 확인해주세요.");
 			System.out.println("상세오류를 확인합니다. 관리자에게 보여주세요.");
 			System.out.println(se.toString());
 			System.out.println("이전 단계로 돌아갑니다.");
@@ -111,14 +118,34 @@ public final class PurchaseTime {
 		
 	}	
 	
-	//feeNum에 따른 금액 및 시간정보 받아오기
 	//100분, 2000원 결제 하시겠습니까? 결제안전장치기능
+	//카드결제, 현금결제 결제 방식 선택받기
 	public void getInfo(TimeData data) {
+		int change =0;
 		System.out.print(data.getTimeAddMin()+"분, "+data.getTimePrice()+"원 결제 하시겠습니까? (y/n)");
+		//
 		String input = Main.SC.nextLine().trim();
 		if(input.equalsIgnoreCase("y")) {
-			System.out.println("결제가 완료되었습니다.");
-			addPayList(data);
+			//카드결제인지 현금결제인지 묻기
+			System.out.println("어떤 방식으로 결제하시겠습니까?");
+			System.out.println("1.카드결제 2.현금결제");
+			
+			//스캐너로 값입력받기
+			String input2 = Main.SC.nextLine().trim();
+			
+			//switch문으로 선택하기
+			switch(input2) {
+			case "1" : payCard(data); break;
+			case "2" : 
+				change = payCash(data); 
+				System.out.println("거스름돈 : "+change +"원");
+				addPayList(data);
+				break;
+			default : 
+				System.out.println("잘못된 입력입니다. 전 단계로 돌아갑니다.");
+				showTimeTable();
+				
+			}
 			
 		}else if(input.equalsIgnoreCase("n")) {
 			System.out.println("결제가 취소되었습니다. 이전 화면으로 돌아갑니다.");
@@ -130,7 +157,25 @@ public final class PurchaseTime {
 		}
 		
 	}
+	public void payCard(TimeData data) {
+		System.out.println("카드결제가 완료되었습니다.");
+		addPayList(data);
+	}
 	
+	public int payCash(TimeData data) {
+		//고객에게 받은 금액
+		System.out.print("내실 현금을 입력해주세요.:");
+		String input = Main.SC.nextLine();
+		int inputCash = Integer.parseInt(input);
+		
+		//요금제 가격 알아와야함
+		int timePrice = data.getTimePrice();
+		
+		//내실금액에서 요금제 가격을 뺀 금액구해서 int 거스름돈 반환하기change
+		int change = inputCash - timePrice;
+		return change;
+		
+	}
 	
 	
 	//시간권 결제내역테이블에 결제 내역 추가하기
@@ -180,7 +225,7 @@ public final class PurchaseTime {
 		
 		
 			//SQL문 작성(update) : 적립시간에 결제시간 더한 값 회원정보에 업데이트하기 
-			String sql02 ="UPDATE MEMBER SET MEM_TIME =MEM_TIME+ ? WHERE MEM_NUM = ?";
+			String sql02 ="UPDATE MEMBER SET MEM_TIME =MEM_TIME + ? WHERE MEM_NUM = ?";
 			PreparedStatement pstmt02 = conn.prepareStatement(sql02); //se
 			pstmt02.setInt(1, data.getTimeAddMin()); //se
 			pstmt02.setInt(2, loginMemNum); //se
